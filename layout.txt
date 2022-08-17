@@ -1,0 +1,75 @@
+
+Total file size (including headers and indexes) can't be larger than 2**64.
+
+Everything except the HEAD section (including the compression and
+encryption data, if any) is encrytpted using the encryption method.
+
+Only file data is compressed.
+
+Besides the header part of the HEAD section that has to be at the
+beginning of a file, everything else can be stored in any arbitrary
+order since every reference is done via absolute offsets from the
+beginning of the file.
+
+
+HEAD
+
+ 0-8  | magic
+ 8-16 | root inode offset
+16-17 | version major
+17-18 | version minor
+18-19 | compression type
+19-20 | encryption type
+20-24 | encryption data offset
+24-32 | <padding> // checksum?
+
+The header is immediatly followed by the compression data, which can't
+be larger than (2**32 - 32)
+
+The encryption data normally follows, aligned to the next 8 bytes boundary.
+It can be arbitrarily large.
+
+If major version differs, then incompatible on-disk format
+If minor version differs, then possibly new values for some types, but no format changes.
+
+encryption types
+
+0 = NONE
+
+compression types
+
+0 = NONE
+
+
+FILEDATA
+
+Files are optionally dedupped, then compressed, then encrypted
+
+Each encryption and compression is done per-file so that they can be
+easily retrived individually
+
+
+INODE
+
+ 0-8  | parent inode
+ 8-16 | offset
+16-24 | size
+24-25 | inode type
+25-32 | <padding>
+
+padding may be allocated to some use in the future, for now, the value
+of the bytes stored there do not matter.
+
+DIRENTS
+
+ 0-8  | name offset
+ 8-16 | inode offset
+
+dirents for a single directory MUST be contiguous and sorted by
+name. The names can be stored before or after, in any order. The names
+should not include '.' or '..' since those entries can be sythesized
+from other data.
+
+Name are stored with a terminating NUL byte since filenames can't
+contain NUL. Other than that name are arbitry byte strings and don't
+have to be valid in any specific text encoding.
