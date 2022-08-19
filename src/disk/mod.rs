@@ -2,6 +2,9 @@
 
 pub mod write;
 
+#[cfg(test)]
+mod tests;
+
 // This is for read_at/read_exact_at
 use std::os::unix::fs::FileExt;
 
