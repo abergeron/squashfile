@@ -1,27 +1,26 @@
 // Stuff to write images from a folder
 
-use std::io::Write;
 use std::io::Seek;
+use std::io::Write;
 use std::os::unix::ffi::OsStrExt;
 
 use crate::error::Error;
 type Result<T> = std::result::Result<T, Error>;
 use crate::disk;
 
+use std::fs;
 use std::io;
 use std::path::Path;
-use std::fs;
 
 fn struct_to_slice<T>(ptr: &T) -> &[u8] {
-    unsafe {
-        std::slice::from_raw_parts(
-            (ptr as *const T) as *const u8,
-            std::mem::size_of::<T>()
-        )
-    }
+    unsafe { std::slice::from_raw_parts((ptr as *const T) as *const u8, std::mem::size_of::<T>()) }
 }
 
-fn write_header<S: Write + Seek>(out: &mut S, root_inode: u64, encryption_offset: u32) -> Result<()> {
+fn write_header<S: Write + Seek>(
+    out: &mut S,
+    root_inode: u64,
+    encryption_offset: u32,
+) -> Result<()> {
     let mut header = disk::Header::default();
     header.magic = disk::MAGIC;
     header.root_inode = root_inode.into();
@@ -30,7 +29,8 @@ fn write_header<S: Write + Seek>(out: &mut S, root_inode: u64, encryption_offset
     header.compression_type = disk::CompressionType::None as u8;
     header.encryption_type = disk::EncryptionType::None as u8;
     header.encryption_data_offset = encryption_offset.into();
-    out.write_all(struct_to_slice(&header)).map_err(|e| e.into())
+    out.write_all(struct_to_slice(&header))
+        .map_err(|e| e.into())
 }
 
 fn write_file<P: AsRef<Path>, S: Write + Seek>(file: P, out: &mut S) -> Result<u64> {
@@ -72,7 +72,9 @@ fn write_directory<P: AsRef<Path>, S: Write + Seek>(dir: P, out: &mut S) -> Resu
         } else if ft.is_dir() {
             write_directory(entry.path(), out)?
         } else {
-            return Err(Error::InvalidOperation(format!("Unsupported file type {ft:?}").into()))
+            return Err(Error::InvalidOperation(
+                format!("Unsupported file type {ft:?}").into(),
+            ));
         };
         entries.push(disk::Dirent {
             name: name_pos.into(),
@@ -127,4 +129,3 @@ pub fn write_image<P: AsRef<Path>, S: Write + Seek>(source: P, out: &mut S) -> R
     out.rewind()?;
     write_header(out, root_inode, encryption_offset)
 }
-

@@ -3,12 +3,11 @@
 use crate::disk;
 use crate::error::Error;
 
-use std::path;
 use std::ffi::CString;
 use std::iter::Iterator;
+use std::path;
 
 type Result<T> = std::result::Result<T, Error>;
-
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct FileType {
@@ -56,16 +55,21 @@ pub struct FS {
 }
 
 impl FileType {
-    pub fn is_dir(&self) -> bool { self.ty == disk::InodeType::Directory }
-    pub fn is_file(&self) -> bool { self.ty == disk::InodeType::File }
-    pub fn is_symlink(&self) -> bool { self.ty == disk::InodeType::Symlink }
+    pub fn is_dir(&self) -> bool {
+        self.ty == disk::InodeType::Directory
+    }
+    pub fn is_file(&self) -> bool {
+        self.ty == disk::InodeType::File
+    }
+    pub fn is_symlink(&self) -> bool {
+        self.ty == disk::InodeType::Symlink
+    }
 }
 
 impl<'a> DirEntry<'a> {
     pub fn file_type(&self) -> FileType {
         FileType {
-            ty: self.ent.inode(self.img).expect("").
-                inode_type().expect("")
+            ty: self.ent.inode(self.img).expect("").inode_type().expect(""),
         }
     }
 
@@ -110,10 +114,7 @@ impl<'a> Directory<'a> {
     }
 
     pub fn iter(&'a self) -> ReadDir<'a> {
-        ReadDir {
-            dir: self,
-            pos: 0,
-        }
+        ReadDir { dir: self, pos: 0 }
     }
 }
 
@@ -172,7 +173,7 @@ impl<'a> Iterator for ReadDir<'a> {
 
 impl FS {
     pub fn open<P: AsRef<path::Path>>(path: P) -> Result<FS> {
-        Ok( FS {
+        Ok(FS {
             img: disk::open_file(path)?,
         })
     }

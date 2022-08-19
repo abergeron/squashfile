@@ -1,8 +1,8 @@
 #[macro_use]
 extern crate static_assertions;
 
-use std::path::Path;
 use std::io;
+use std::path::Path;
 
 mod disk;
 mod error;
@@ -10,7 +10,6 @@ pub mod fs;
 
 use error::Error;
 type Result<T> = std::result::Result<T, Error>;
-
 
 pub fn write_image<P: AsRef<Path>, S: io::Write + io::Seek>(source: P, out: &mut S) -> Result<()> {
     disk::write::write_image(source, out)

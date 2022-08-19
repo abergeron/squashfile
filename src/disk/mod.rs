@@ -7,11 +7,11 @@ use std::os::unix::fs::FileExt;
 
 use memchr::memchr;
 
-use std::io;
 use crate::error::Error;
 use std::convert::TryFrom;
-use std::fs;
 use std::ffi::CString;
+use std::fs;
+use std::io;
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -22,7 +22,7 @@ pub static VERSION_MINOR: u8 = 0;
 #[derive(Copy, Clone, Debug, Default)]
 #[repr(C, packed(8))]
 struct u64le {
-    val: u64
+    val: u64,
 }
 
 impl From<u64le> for u64 {
@@ -33,16 +33,14 @@ impl From<u64le> for u64 {
 
 impl From<u64> for u64le {
     fn from(v: u64) -> u64le {
-        u64le {
-            val: u64::to_le(v),
-        }
+        u64le { val: u64::to_le(v) }
     }
 }
 
 #[derive(Copy, Clone, Debug, Default)]
 #[repr(C, packed(4))]
 struct u32le {
-    val: u32
+    val: u32,
 }
 
 impl From<u32le> for u32 {
@@ -53,9 +51,7 @@ impl From<u32le> for u32 {
 
 impl From<u32> for u32le {
     fn from(v: u32) -> u32le {
-        u32le {
-            val: u32::to_le(v),
-        }
+        u32le { val: u32::to_le(v) }
     }
 }
 
@@ -89,7 +85,7 @@ enum CompressionType {
 
 impl TryFrom<u8> for CompressionType {
     type Error = Error;
-    
+
     fn try_from(val: u8) -> Result<Self> {
         match val {
             0 => Ok(CompressionType::None),
@@ -181,12 +177,7 @@ pub struct Image {
 }
 
 fn struct_to_mut_slice<T>(ptr: &mut T) -> &mut [u8] {
-    unsafe {
-        std::slice::from_raw_parts_mut(
-            (ptr as *mut T) as *mut u8,
-            std::mem::size_of::<T>()
-        )
-    }
+    unsafe { std::slice::from_raw_parts_mut((ptr as *mut T) as *mut u8, std::mem::size_of::<T>()) }
 }
 
 fn read_header(file: &fs::File) -> Result<Header> {
@@ -237,14 +228,16 @@ impl Inode {
     pub fn parent_inode(&self, img: &Image) -> Result<Inode> {
         img.read_inode(self.parent_inode.into())
     }
-    
+
     pub fn inode_type(&self) -> Result<InodeType> {
         InodeType::try_from(self.inode_type)
     }
 
     pub fn read_dirent(&self, pos: u64, img: &Image) -> Result<Dirent> {
         if self.inode_type()? != InodeType::Directory {
-            return Err(Error::InvalidOperation("Reading dirents from non-directory".into()));
+            return Err(Error::InvalidOperation(
+                "Reading dirents from non-directory".into(),
+            ));
         }
         let offset = u64::from(self.offset) + (pos * std::mem::size_of::<Dirent>() as u64);
         if offset > self.size() {
@@ -277,15 +270,17 @@ impl Dirent {
 }
 
 impl Image {
-    fn read_inode(&self, off: u64)-> Result<Inode> {
+    fn read_inode(&self, off: u64) -> Result<Inode> {
         let mut buf = Inode::default();
-        self.file.read_exact_at(struct_to_mut_slice(&mut buf), off)?;
+        self.file
+            .read_exact_at(struct_to_mut_slice(&mut buf), off)?;
         Ok(buf)
     }
 
     fn read_dirent(&self, off: u64) -> Result<Dirent> {
         let mut buf = Dirent::default();
-        self.file.read_exact_at(struct_to_mut_slice(&mut buf), off)?;
+        self.file
+            .read_exact_at(struct_to_mut_slice(&mut buf), off)?;
         Ok(buf)
     }
 
@@ -303,14 +298,14 @@ impl Image {
             match memchr(0, &tmp) {
                 Some(i) => {
                     buf.extend_from_slice(&tmp[..=i]);
-                    return Ok(unsafe { CString::from_vec_with_nul_unchecked(buf) })
+                    return Ok(unsafe { CString::from_vec_with_nul_unchecked(buf) });
                 }
-                None => buf.extend_from_slice(tmp)
+                None => buf.extend_from_slice(tmp),
             }
         }
     }
 
-    fn read_file(&self, buf: &mut [u8], off: u64) -> Result<()>{
+    fn read_file(&self, buf: &mut [u8], off: u64) -> Result<()> {
         self.file.read_exact_at(buf, off).map_err(|e| e.into())
     }
 
