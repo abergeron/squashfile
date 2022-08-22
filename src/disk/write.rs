@@ -114,6 +114,8 @@ pub fn write_image<P: AsRef<Path>, S: Write + Seek>(source: P, out: &mut S) -> R
     if !fs::metadata(&source)?.is_dir() {
         return Err(Error::InvalidOperation("root is not a directory".into()));
     }
+    // Skip the header for now
+    out.seek(io::SeekFrom::Start(std::mem::size_of::<disk::Header>() as u64));
     // write_compression_data(out);
     // write_encryption_data(out);
     let encryption_offset = 0;
