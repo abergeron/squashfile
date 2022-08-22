@@ -9,3 +9,4 @@ edition = "2021"
 static_assertions = "1.1"
 memchr = "2.5"
 thiserror = "1.0"
+clap = { version = "3.2", features = ["derive"] }
