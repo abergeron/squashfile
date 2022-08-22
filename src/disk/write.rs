@@ -58,8 +58,11 @@ fn write_symlink<P: AsRef<Path>, S: Write + Seek>(link: P, out: &mut S) -> Resul
 
 fn write_directory<P: AsRef<Path>, S: Write + Seek>(dir: P, out: &mut S) -> Result<u64> {
     let mut entries = Vec::new();
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
+    let iter = fs::read_dir(dir)?;
+    let mut tmp: std::result::Result<Vec<_>, io::Error> = iter.collect();
+    let mut paths = tmp?;
+    paths.sort_by_key(|e| e.path());
+    for entry in paths {
         let ft = entry.file_type()?;
         let name_pos = out.stream_position()?;
         out.write_all(entry.file_name().as_bytes())?;
