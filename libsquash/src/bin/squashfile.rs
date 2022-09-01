@@ -1,12 +1,12 @@
-use clap::{Parser, Args, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
-use squashfile::write_image_file;
-use squashfile::Result;
+use libsquash::write_image_file;
+use libsquash::Result;
 
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[clap(rename_all="lower")]
+#[clap(rename_all = "lower")]
 struct Cli {
     #[clap(subcommand)]
     command: Command,

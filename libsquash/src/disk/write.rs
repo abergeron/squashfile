@@ -59,7 +59,7 @@ fn write_symlink<P: AsRef<Path>, S: Write + Seek>(link: P, out: &mut S) -> Resul
 fn write_directory<P: AsRef<Path>, S: Write + Seek>(dir: P, out: &mut S) -> Result<u64> {
     let mut entries = Vec::new();
     let iter = fs::read_dir(dir)?;
-    let mut tmp: std::result::Result<Vec<_>, io::Error> = iter.collect();
+    let tmp: std::result::Result<Vec<_>, io::Error> = iter.collect();
     let mut paths = tmp?;
     paths.sort_by_key(|e| e.path());
     for entry in paths {
@@ -115,7 +115,9 @@ pub fn write_image<P: AsRef<Path>, S: Write + Seek>(source: P, out: &mut S) -> R
         return Err(Error::InvalidOperation("root is not a directory".into()));
     }
     // Skip the header for now
-    out.seek(io::SeekFrom::Start(std::mem::size_of::<disk::Header>() as u64));
+    out.seek(io::SeekFrom::Start(
+        std::mem::size_of::<disk::Header>() as u64
+    ))?;
     // write_compression_data(out);
     // write_encryption_data(out);
     let encryption_offset = 0;
