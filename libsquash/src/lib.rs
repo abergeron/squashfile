@@ -5,7 +5,7 @@ use std::io;
 use std::path::Path;
 
 mod disk;
-mod error;
+pub mod error;
 pub mod fs;
 
 use error::Error;
