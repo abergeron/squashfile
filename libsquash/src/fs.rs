@@ -3,6 +3,7 @@
 use crate::disk;
 use crate::error::Error;
 
+use std::sync::Arc;
 use std::cmp::Ordering;
 use std::ffi::CString;
 use std::iter::Iterator;
@@ -15,37 +16,37 @@ pub struct FileType {
     ty: disk::InodeType,
 }
 
-#[derive(Copy, Clone)]
-pub struct DirEntry<'a> {
-    img: &'a disk::Image,
+#[derive(Clone, Debug)]
+pub struct DirEntry {
+    img: Arc<disk::Image>,
     ent: disk::Dirent,
 }
 
-#[derive(Copy, Clone, Debug)]
-pub struct Directory<'a> {
-    img: &'a disk::Image,
+#[derive(Clone, Debug)]
+pub struct Directory {
+    img: Arc<disk::Image>,
     inode: disk::Inode,
 }
 
-#[derive(Copy, Clone, Debug)]
-pub struct File<'a> {
-    img: &'a disk::Image,
+#[derive(Clone, Debug)]
+pub struct File {
+    img: Arc<disk::Image>,
     inode: disk::Inode,
 }
 
-#[derive(Copy, Clone, Debug)]
-pub struct Symlink<'a> {
-    img: &'a disk::Image,
+#[derive(Clone, Debug)]
+pub struct Symlink {
+    img: Arc<disk::Image>,
     inode: disk::Inode,
 }
 
-pub enum FSItem<'a> {
-    File(File<'a>),
-    Directory(Directory<'a>),
-    Symlink(Symlink<'a>),
+pub enum FSItem {
+    File(File),
+    Directory(Directory),
+    Symlink(Symlink),
 }
 
-fn new_fsitem<'a>(img: &'a disk::Image, inode: disk::Inode) -> Result<FSItem<'a>> {
+fn new_fsitem(img: Arc<disk::Image>, inode: disk::Inode) -> Result<FSItem> {
     Ok(match inode.inode_type()? {
         disk::InodeType::File => FSItem::File(File::new(inode, img)),
         disk::InodeType::Directory => FSItem::Directory(Directory::new(inode, img)),
@@ -54,13 +55,13 @@ fn new_fsitem<'a>(img: &'a disk::Image, inode: disk::Inode) -> Result<FSItem<'a>
 }
 
 #[derive(Debug)]
-pub struct ReadDir<'a> {
-    dir: &'a Directory<'a>,
+pub struct ReadDir {
+    dir: Directory,
     pos: u64,
 }
 
 pub struct FS {
-    img: disk::Image,
+    img: Arc<disk::Image>,
 }
 
 impl FileType {
@@ -75,25 +76,25 @@ impl FileType {
     }
 }
 
-impl<'a> DirEntry<'a> {
+impl DirEntry {
     pub fn file_type(&self) -> Result<FileType> {
         Ok(FileType {
-            ty: self.ent.inode(self.img)?.inode_type()?,
+            ty: self.ent.inode(self.img.as_ref())?.inode_type()?,
         })
     }
 
     pub fn file_name(&self) -> Result<CString> {
-        self.ent.name(self.img)
+        self.ent.name(self.img.as_ref())
     }
 
-    pub fn item(&self) -> Result<FSItem<'a>> {
-        let inode = self.ent.inode(self.img)?;
-        Ok(new_fsitem(self.img, inode)?)
+    pub fn item(&self) -> Result<FSItem> {
+        let inode = self.ent.inode(self.img.as_ref())?;
+        Ok(new_fsitem(self.img.clone(), inode)?)
     }
 }
 
-impl<'a> Directory<'a> {
-    fn new(inode: disk::Inode, img: &'a disk::Image) -> Self {
+impl Directory {
+    fn new(inode: disk::Inode, img: Arc<disk::Image>) -> Self {
         std::debug_assert!(inode.inode_type().expect("") == disk::InodeType::Directory);
         Directory {
             inode: inode,
@@ -105,28 +106,28 @@ impl<'a> Directory<'a> {
         self.inode.size() / std::mem::size_of::<disk::Dirent>() as u64
     }
 
-    pub fn resolve<P: AsRef<[u8]>>(&self, path: P) -> Result<Option<FSItem<'a>>> {
-        resolve_dir(&self.img, self, path)
+    pub fn resolve<P: AsRef<[u8]>>(&self, path: P) -> Result<Option<FSItem>> {
+        resolve_dir(self.img.clone(), self, path)
     }
 
-    pub fn get(&self, pos: u64) -> Result<Option<DirEntry<'a>>> {
+    pub fn get(&self, pos: u64) -> Result<Option<DirEntry>> {
         if pos >= self.len() {
             Ok(None)
         } else {
             Ok(Some(DirEntry {
-                ent: self.inode.read_dirent(pos, self.img)?,
-                img: self.img,
+                ent: self.inode.read_dirent(pos, self.img.as_ref())?,
+                img: self.img.clone(),
             }))
         }
     }
 
-    pub fn iter(&'a self) -> ReadDir<'a> {
-        ReadDir { dir: self, pos: 0 }
+    pub fn iter(&self) -> ReadDir {
+        ReadDir { dir: self.clone(), pos: 0 }
     }
 }
 
-impl<'a> File<'a> {
-    fn new(inode: disk::Inode, img: &'a disk::Image) -> Self {
+impl File {
+    fn new(inode: disk::Inode, img: Arc<disk::Image>) -> Self {
         std::debug_assert!(inode.inode_type().expect("") == disk::InodeType::File);
         File {
             inode: inode,
@@ -139,12 +140,12 @@ impl<'a> File<'a> {
     }
 
     pub fn read_at(&self, buf: &mut [u8], offset: u64) -> Result<()> {
-        self.inode.read_at(buf, offset, self.img)
+        self.inode.read_at(buf, offset, self.img.as_ref())
     }
 }
 
-impl<'a> Symlink<'a> {
-    fn new(inode: disk::Inode, img: &'a disk::Image) -> Self {
+impl Symlink {
+    fn new(inode: disk::Inode, img: Arc<disk::Image>) -> Self {
         std::debug_assert!(inode.inode_type().expect("") == disk::InodeType::Symlink);
         Symlink {
             inode: inode,
@@ -154,13 +155,13 @@ impl<'a> Symlink<'a> {
 
     pub fn get_link(&self) -> Result<Vec<u8>> {
         let mut res = Vec::with_capacity(self.inode.size() as usize);
-        self.inode.read_at(res.as_mut_slice(), 0, self.img)?;
+        self.inode.read_at(res.as_mut_slice(), 0, self.img.as_ref())?;
         Ok(res)
     }
 }
 
-impl<'a> Iterator for ReadDir<'a> {
-    type Item = Result<DirEntry<'a>>;
+impl Iterator for ReadDir {
+    type Item = Result<DirEntry>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let res = self.dir.get(self.pos);
@@ -181,20 +182,20 @@ impl<'a> Iterator for ReadDir<'a> {
 impl FS {
     pub fn open<P: AsRef<path::Path>>(path: P) -> Result<FS> {
         Ok(FS {
-            img: disk::open_file(path)?,
+            img: Arc::new(disk::open_file(path)?),
         })
     }
 
-    pub fn get_root<'a>(&'a self) -> Result<Directory<'a>> {
+    pub fn get_root(&self) -> Result<Directory> {
         let inode = self.img.root_inode()?;
         if inode.inode_type()? != disk::InodeType::Directory {
             return Err(Error::Format("root inode is not a directory".into()));
         }
-        Ok(Directory::new(inode, &self.img))
+        Ok(Directory::new(inode, self.img.clone()))
     }
 
-    pub fn resolve<'a, P: AsRef<[u8]>>(&'a self, path: P) -> Result<Option<FSItem<'a>>> {
-        resolve_dir(&self.img, &self.get_root()?, path)
+    pub fn resolve<P: AsRef<[u8]>>(&self, path: P) -> Result<Option<FSItem>> {
+        resolve_dir(self.img.clone(), &self.get_root()?, path)
     }
 }
 
@@ -246,7 +247,7 @@ fn resolve_path<P: AsRef<[u8]>>(
         };
         if new.inode_type()? == disk::InodeType::Symlink {
             let mut link_path = Vec::with_capacity(new.size() as usize);
-            new.read_at(link_path.as_mut_slice(), 0, img)?;
+            new.read_at(link_path.as_mut_slice(), 0, &img)?;
             cur = match resolve_path(img, &cur, link_path)? {
                 None => return Ok(None),
                 Some(i) => i,
@@ -258,12 +259,12 @@ fn resolve_path<P: AsRef<[u8]>>(
     Ok(Some(cur))
 }
 
-fn resolve_dir<'a, P: AsRef<[u8]>>(
-    img: &'a disk::Image,
-    root: &Directory<'a>,
+fn resolve_dir<P: AsRef<[u8]>>(
+    img: Arc<disk::Image>,
+    root: &Directory,
     path: P,
-) -> Result<Option<FSItem<'a>>> {
-    let inode = resolve_path(img, &root.inode, path)?;
+) -> Result<Option<FSItem>> {
+    let inode = resolve_path(img.as_ref(), &root.inode, path)?;
     match inode {
         None => Ok(None),
         Some(i) => Ok(Some(new_fsitem(img, i)?)),
