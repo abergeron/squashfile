@@ -12,18 +12,18 @@ use std::path::PathBuf;
 
 create_exception!(pysquash, SquashError, pyo3::exceptions::PyException);
 
-#[pyclass]
+#[pyclass(module="pysquash.pysquash")]
 struct SquashCursor {
     dir: fs::Directory,
 }
 
-#[pyclass]
+#[pyclass(module="pysquash.pysquash")]
 struct SquashFile {
     f: fs::File,
     pos: u64,
 }
 
-#[pyclass]
+#[pyclass(module="pysquash.pysquash")]
 struct SquashDirIter {
     rd: fs::ReadDir,
 }
@@ -106,7 +106,7 @@ impl SquashDirIter {
         slf
     }
 
-    fn __next__(&mut self, py: Python<'_>) -> PyResult<Option<PyObject>> {
+    fn __next__(&mut self, py: Python<'_>) -> PyResult<Option<PyBytes>> {
        match self.rd.next() {
             None => Ok(None),
             Some(Err(e)) => Err(convert_err(e)),
