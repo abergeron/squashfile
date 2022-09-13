@@ -3,11 +3,11 @@
 use crate::disk;
 use crate::error::Error;
 
-use std::sync::Arc;
 use std::cmp::Ordering;
 use std::ffi::CString;
 use std::iter::Iterator;
 use std::path;
+use std::sync::Arc;
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -121,7 +121,10 @@ impl Directory {
     }
 
     pub fn iter(&self) -> ReadDir {
-        ReadDir { dir: self.clone(), pos: 0 }
+        ReadDir {
+            dir: self.clone(),
+            pos: 0,
+        }
     }
 }
 
@@ -154,7 +157,8 @@ impl Symlink {
 
     pub fn get_link(&self) -> Result<Vec<u8>> {
         let mut res = Vec::with_capacity(self.inode.size() as usize);
-        self.inode.read_at(res.as_mut_slice(), 0, self.img.as_ref())?;
+        self.inode
+            .read_at(res.as_mut_slice(), 0, self.img.as_ref())?;
         Ok(res)
     }
 }
