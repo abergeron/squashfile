@@ -16,25 +16,25 @@ pub struct FileType {
     ty: disk::InodeType,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct DirEntry {
     img: Arc<disk::Image>,
     ent: disk::Dirent,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Directory {
     img: Arc<disk::Image>,
     inode: disk::Inode,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct File {
     img: Arc<disk::Image>,
     inode: disk::Inode,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Symlink {
     img: Arc<disk::Image>,
     inode: disk::Inode,
@@ -54,7 +54,6 @@ fn new_fsitem(img: Arc<disk::Image>, inode: disk::Inode) -> Result<FSItem> {
     })
 }
 
-#[derive(Debug)]
 pub struct ReadDir {
     dir: Directory,
     pos: u64,

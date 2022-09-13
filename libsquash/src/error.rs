@@ -4,6 +4,10 @@ use std::io;
 pub enum Error {
     #[error("IO error")]
     IO(#[from] io::Error),
+    #[error("Crypto error")]
+    Crypto(String),
+    #[error("Decompression error")]
+    Compression(String),
     #[error("Invalid value: {0}")]
     Format(String),
     #[error("Value out of bounds: {0}")]

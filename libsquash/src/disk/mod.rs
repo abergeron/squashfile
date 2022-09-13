@@ -5,6 +5,8 @@ pub mod write;
 #[cfg(test)]
 mod tests;
 
+mod crypt;
+
 // This is for read_at/read_exact_at
 use std::os::unix::fs::FileExt;
 
@@ -61,6 +63,7 @@ impl From<u32> for u32le {
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 enum EncryptionType {
     None,
+    ChaCha20,
 }
 
 impl TryFrom<u8> for EncryptionType {
@@ -69,6 +72,7 @@ impl TryFrom<u8> for EncryptionType {
     fn try_from(val: u8) -> Result<Self> {
         match val {
             0 => Ok(EncryptionType::None),
+            1 => Ok(EncryptionType::ChaCha20),
             _ => Err(Error::Format("EncryptionType".into())),
         }
     }
@@ -78,6 +82,7 @@ impl From<EncryptionType> for u8 {
     fn from(val: EncryptionType) -> u8 {
         match val {
             EncryptionType::None => 0,
+            EncryptionType::ChaCha20 => 1,
         }
     }
 }
@@ -171,9 +176,8 @@ pub struct Dirent {
 
 assert_eq_size!(Dirent, [u8; 16]);
 
-#[derive(Debug)]
 pub struct Image {
-    file: fs::File,
+    file: Box<dyn crypt::Decrypter>,
     header: Header,
     // we only have None for the compression and encryption for now
     // later there will be fields here to deal with those
@@ -206,17 +210,20 @@ pub fn open_file<P: AsRef<std::path::Path>>(path: P) -> Result<Image> {
         return Err(Error::Format("Unsupported minor version".into()));
     }
 
+    let stream = match EncryptionType::try_from(header.encryption_type)? {
+        EncryptionType::None => Box::new(crypt::EncryptNone::new(file)),
+        EncryptionType::ChaCha20 => {
+            panic!("Code for decryption not ready yet")
+        }
+    };
+
     let comp_type = CompressionType::try_from(header.compression_type)?;
     if comp_type != CompressionType::None {
         return Err(Error::Bounds("Unsupported compression type".into()));
     }
 
-    if EncryptionType::try_from(header.encryption_type)? != EncryptionType::None {
-        return Err(Error::Bounds("Unsupported encryption type".into()));
-    }
-
     Ok(Image {
-        file: file,
+        file: stream,
         header: header,
     })
 }
