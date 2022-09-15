@@ -28,6 +28,7 @@ If minor version differs, then possibly new values for some types, but no format
 encryption types
 
 0 = NONE
+1 = ChaCha20 (stream mode, no AEAD)
 
 compression types
 
