@@ -19,7 +19,6 @@ fn struct_to_slice<T>(ptr: &T) -> &[u8] {
 fn write_header<S: Write + Seek>(
     out: &mut S,
     root_inode: u64,
-    encryption_offset: u32,
 ) -> Result<()> {
     let mut header = disk::Header::default();
     header.magic = disk::MAGIC;
@@ -28,7 +27,6 @@ fn write_header<S: Write + Seek>(
     header.version_minor = disk::VERSION_MINOR;
     header.compression_type = disk::CompressionType::None as u8;
     header.encryption_type = disk::EncryptionType::None as u8;
-    header.encryption_data_offset = encryption_offset.into();
     out.write_all(struct_to_slice(&header))
         .map_err(|e| e.into())
 }
@@ -118,9 +116,6 @@ pub fn write_image<P: AsRef<Path>, S: Write + Seek>(source: P, out: &mut S) -> R
     out.seek(io::SeekFrom::Start(
         std::mem::size_of::<disk::Header>() as u64
     ))?;
-    // write_compression_data(out);
-    // write_encryption_data(out);
-    let encryption_offset = 0;
 
     // wrap with encrypter eventually
     let out_enc = out;
@@ -134,5 +129,5 @@ pub fn write_image<P: AsRef<Path>, S: Write + Seek>(source: P, out: &mut S) -> R
     // Get the original steam back from the encrypter
     let out = out_enc;
     out.rewind()?;
-    write_header(out, root_inode, encryption_offset)
+    write_header(out, root_inode)
 }

@@ -20,14 +20,7 @@ HEAD
 17-18 | version minor
 18-19 | compression type
 19-20 | encryption type
-20-24 | encryption data offset
-24-32 | <padding> // checksum?
-
-The header is immediatly followed by the compression data, which can't
-be larger than (2**32 - 32)
-
-The encryption data normally follows, aligned to the next 8 bytes boundary.
-It can be arbitrarily large.
+20-32 | <padding> // checksum?
 
 If major version differs, then incompatible on-disk format
 If minor version differs, then possibly new values for some types, but no format changes.
@@ -40,6 +33,9 @@ compression types
 
 0 = NONE
 
+If the encryption or compression layers require additional data, they
+should make sure that some space is unreserved in the image and store
+their data there.
 
 FILEDATA
 

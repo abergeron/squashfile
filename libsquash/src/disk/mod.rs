@@ -120,7 +120,7 @@ struct Header {
     version_minor: u8,
     compression_type: u8,
     encryption_type: u8,
-    encryption_data_offset: u32le,
+    _pad1: u32,
     _pad2: u64,
 }
 
