@@ -20,6 +20,6 @@ pub fn write_image_file<P: AsRef<Path>, S: AsRef<Path>>(source: &P, file: &S) ->
     write_image(source, &mut file)
 }
 
-pub fn open_image_file<P: AsRef<Path>>(img: P) -> Result<fs::FS> {
-    fs::FS::open(img)
+pub fn open_image_file<P: AsRef<Path>>(img: P, key: Option<&[u8]>, nonce: Option<&[u8]>) -> Result<fs::FS> {
+    fs::FS::open(img, key, nonce)
 }

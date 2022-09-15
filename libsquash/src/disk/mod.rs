@@ -5,7 +5,8 @@ pub mod write;
 #[cfg(test)]
 mod tests;
 
-mod crypt;
+mod crypto;
+use crypto::Decrypter;
 
 // This is for read_at/read_exact_at
 use std::os::unix::fs::FileExt;
@@ -177,7 +178,7 @@ pub struct Dirent {
 assert_eq_size!(Dirent, [u8; 16]);
 
 pub struct Image {
-    file: Box<dyn crypt::Decrypter>,
+    file: Box<dyn crypto::Decrypter>,
     header: Header,
     // we only have None for the compression and encryption for now
     // later there will be fields here to deal with those
@@ -193,7 +194,7 @@ fn read_header(file: &fs::File) -> Result<Header> {
     Ok(buf)
 }
 
-pub fn open_file<P: AsRef<std::path::Path>>(path: P) -> Result<Image> {
+pub fn open_file<P: AsRef<std::path::Path>>(path: P, key: Option<&[u8]>, nonce: Option<&[u8]>) -> Result<Image> {
     let file = fs::File::open(path)?;
 
     let header = read_header(&file)?;
@@ -210,11 +211,19 @@ pub fn open_file<P: AsRef<std::path::Path>>(path: P) -> Result<Image> {
         return Err(Error::Format("Unsupported minor version".into()));
     }
 
-    let stream = match EncryptionType::try_from(header.encryption_type)? {
-        EncryptionType::None => Box::new(crypt::EncryptNone::new(file)),
+    let stream: Box<dyn Decrypter> = match EncryptionType::try_from(header.encryption_type)? {
+        EncryptionType::None => Box::new(crypto::EncryptNone::new(file)),
         EncryptionType::ChaCha20 => {
-            panic!("Code for decryption not ready yet")
-        }
+            if let Some(key) = key {
+                if let Some(nonce) = nonce {
+                    Box::new(crypto::EncryptChaCha20::new(file, key, nonce)?)
+                } else {
+                    return Err(Error::Crypto("No provided nonce".into()));
+                }
+            } else {
+                return Err(Error::Crypto("No provided key".into()));
+            }
+        },
     };
 
     let comp_type = CompressionType::try_from(header.compression_type)?;
