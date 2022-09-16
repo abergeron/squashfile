@@ -183,10 +183,22 @@ impl Iterator for ReadDir {
 }
 
 impl FS {
-    pub fn open<P: AsRef<path::Path>>(path: P, key: Option<&[u8]>, nonce: Option<&[u8]>) -> Result<FS> {
+    pub fn open<F: disk::ReadAt + 'static>(
+        f: F,
+        key: Option<&[u8]>,
+        nonce: Option<&[u8]>,
+    ) -> Result<FS> {
         Ok(FS {
-            img: Arc::new(disk::open_file(std::fs::File::open(path)?, key, nonce)?),
+            img: Arc::new(disk::open_file(f, key, nonce)?),
         })
+    }
+
+    pub fn open_file<P: AsRef<path::Path>>(
+        path: P,
+        key: Option<&[u8]>,
+        nonce: Option<&[u8]>,
+    ) -> Result<FS> {
+        FS::open(std::fs::File::open(path)?, key, nonce)
     }
 
     pub fn get_root(&self) -> Result<Directory> {

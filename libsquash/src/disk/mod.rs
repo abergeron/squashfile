@@ -217,14 +217,19 @@ pub trait ReadAt {
 }
 
 impl<T> ReadAt for T
-where T: FileExt,
+where
+    T: FileExt,
 {
     fn read_at(&self, buf: &mut [u8], offset: u64) -> Result<usize> {
         Ok(FileExt::read_at(self, buf, offset)?)
     }
 }
 
-pub fn open_file<F: ReadAt + 'static>(file: F, key: Option<&[u8]>, nonce: Option<&[u8]>) -> Result<Image> {
+pub fn open_file<F: ReadAt + 'static>(
+    file: F,
+    key: Option<&[u8]>,
+    nonce: Option<&[u8]>,
+) -> Result<Image> {
     let header = read_header(&file)?;
 
     if header.magic != MAGIC {
@@ -251,7 +256,7 @@ pub fn open_file<F: ReadAt + 'static>(file: F, key: Option<&[u8]>, nonce: Option
             } else {
                 return Err(Error::Crypto("No provided key".into()));
             }
-        },
+        }
     };
 
     let comp_type = CompressionType::try_from(header.compression_type)?;

@@ -5,11 +5,11 @@ use crate::disk::ReadAt;
 use std::cmp::min;
 
 extern crate chacha20;
-use chacha20::ChaCha20;
-use chacha20::cipher::KeySizeUser;
 use chacha20::cipher::IvSizeUser;
 use chacha20::cipher::KeyIvInit;
+use chacha20::cipher::KeySizeUser;
 use chacha20::cipher::StreamCipher;
+use chacha20::ChaCha20;
 
 pub struct EncryptChaCha20<F> {
     f: F,
@@ -54,10 +54,12 @@ impl<F: ReadAt> ReadAt for EncryptChaCha20<F> {
             // length remaining (up to the size of the block)
             let l = min(len, (CHACHA20_REKEY_PERIOD - p) as usize);
             // current buffer (within the limits of the block)
-            let b = &mut buf[pos..pos+l];
+            let b = &mut buf[pos..pos + l];
             self.block_nonce(&mut nonce, offset);
             let mut crypto = ChaCha20::new(&self.key, &nonce);
-            crypto.try_apply_keystream(b).map_err(|_| Error::Crypto("Decrypting error".into()))?;
+            crypto
+                .try_apply_keystream(b)
+                .map_err(|_| Error::Crypto("Decrypting error".into()))?;
             len -= l;
             pos += l;
         }

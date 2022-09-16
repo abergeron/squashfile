@@ -16,10 +16,7 @@ fn struct_to_slice<T>(ptr: &T) -> &[u8] {
     unsafe { std::slice::from_raw_parts((ptr as *const T) as *const u8, std::mem::size_of::<T>()) }
 }
 
-fn write_header<S: Write + Seek>(
-    out: &mut S,
-    root_inode: u64,
-) -> Result<()> {
+fn write_header<S: Write + Seek>(out: &mut S, root_inode: u64) -> Result<()> {
     let mut header = disk::Header::default();
     header.magic = disk::MAGIC;
     header.root_inode = root_inode.into();
