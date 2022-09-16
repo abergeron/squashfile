@@ -3,6 +3,7 @@ use std::matches;
 use crate::error::Error;
 type Result<T> = std::result::Result<T, Error>;
 
+use crate::disk;
 use crate::disk::u32le;
 use crate::disk::u64le;
 use crate::disk::CompressionType;
@@ -43,10 +44,18 @@ fn test_encryption_type() {
     let v: u8 = 1;
     let t: Result<EncryptionType> = v.try_into();
 
+    assert!(matches!(t, Ok(EncryptionType::ChaCha20)));
+
+    let v: u8 = 2;
+    let t: Result<EncryptionType> = v.try_into();
+
     assert!(matches!(t, Err(_)));
 
     let v: u8 = EncryptionType::None.into();
     assert_eq!(v, 0);
+
+    let v: u8 = EncryptionType::ChaCha20.into();
+    assert_eq!(v, 1);
 }
 
 #[test]
@@ -95,4 +104,18 @@ fn test_inode_type() {
 
     let v: u8 = InodeType::Symlink.into();
     assert_eq!(v, 2);
+}
+
+#[test]
+fn test_open() {
+    let img = disk::open_file("test_data/small.sqh", None, None);
+    assert!(matches!(img, Ok(_)));
+}
+
+#[test]
+fn test_get_root() {
+    let img = disk::open_file("test_data/small.sqh", None, None).unwrap();
+
+    let root = img.root_inode();
+    assert!(matches!(root, Ok(_)));
 }

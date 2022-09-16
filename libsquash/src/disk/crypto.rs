@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::Result;
 
-use std::os::unix::fs::FileExt;
+use crate::disk::ReadAt;
 use std::cmp::min;
 
 extern crate chacha20;
@@ -11,48 +11,16 @@ use chacha20::cipher::IvSizeUser;
 use chacha20::cipher::KeyIvInit;
 use chacha20::cipher::StreamCipher;
 
-pub trait Decrypter {
-    fn read_at(&self, buf: &mut [u8], off: u64) -> Result<usize>;
-
-    fn read_exact_at(&self, buf: &mut [u8], off: u64) -> Result<()> {
-        if self.read_at(buf, off)? != buf.len() {
-            Err(Error::IO(std::io::Error::from(
-                std::io::ErrorKind::UnexpectedEof,
-            )))
-        } else {
-            Ok(())
-        }
-    }
-}
-
-pub struct EncryptNone(std::fs::File);
-
-impl EncryptNone {
-    pub fn new(f: std::fs::File) -> Self {
-        EncryptNone(f)
-    }
-}
-
-impl Decrypter for EncryptNone {
-    fn read_at(&self, buf: &mut [u8], offset: u64) -> Result<usize> {
-        Ok(self.0.read_at(buf, offset)?)
-    }
-
-    fn read_exact_at(&self, buf: &mut [u8], offset: u64) -> Result<()> {
-        Ok(self.0.read_exact_at(buf, offset)?)
-    }
-}
-
-pub struct EncryptChaCha20 {
-    f: std::fs::File,
+pub struct EncryptChaCha20<F> {
+    f: F,
     nonce_prefix: [u8; 4],
     key: chacha20::Key,
 }
 
 const CHACHA20_REKEY_PERIOD: u64 = 4_294_967_296; // 2**32
 
-impl EncryptChaCha20 {
-    pub fn new(f: std::fs::File, key: &[u8], nonce_prefix: &[u8]) -> Result<Self> {
+impl<F> EncryptChaCha20<F> {
+    pub fn new(f: F, key: &[u8], nonce_prefix: &[u8]) -> Result<Self> {
         if key.len() != ChaCha20::key_size() {
             return Err(Error::Crypto("Invalid key length".into()));
         }
@@ -74,7 +42,7 @@ impl EncryptChaCha20 {
     }
 }
 
-impl Decrypter for EncryptChaCha20 {
+impl<F: ReadAt> ReadAt for EncryptChaCha20<F> {
     fn read_at(&self, buf: &mut [u8], offset: u64) -> Result<usize> {
         let mut pos = 0;
         let mut nonce = *chacha20::Nonce::from_slice(&[0; 12]);

@@ -185,7 +185,7 @@ impl Iterator for ReadDir {
 impl FS {
     pub fn open<P: AsRef<path::Path>>(path: P, key: Option<&[u8]>, nonce: Option<&[u8]>) -> Result<FS> {
         Ok(FS {
-            img: Arc::new(disk::open_file(path, key, nonce)?),
+            img: Arc::new(disk::open_file(std::fs::File::open(path)?, key, nonce)?),
         })
     }
 

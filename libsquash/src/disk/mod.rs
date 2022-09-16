@@ -6,7 +6,6 @@ pub mod write;
 mod tests;
 
 mod crypto;
-use crypto::Decrypter;
 
 // This is for read_at/read_exact_at
 use std::os::unix::fs::FileExt;
@@ -16,7 +15,6 @@ use memchr::memchr;
 use crate::error::Error;
 use std::convert::TryFrom;
 use std::ffi::CString;
-use std::fs;
 use std::io;
 
 type Result<T> = std::result::Result<T, Error>;
@@ -178,7 +176,7 @@ pub struct Dirent {
 assert_eq_size!(Dirent, [u8; 16]);
 
 pub struct Image {
-    file: Box<dyn crypto::Decrypter>,
+    file: Box<dyn ReadAt>,
     header: Header,
     // we only have None for the compression and encryption for now
     // later there will be fields here to deal with those
@@ -188,15 +186,45 @@ fn struct_to_mut_slice<T>(ptr: &mut T) -> &mut [u8] {
     unsafe { std::slice::from_raw_parts_mut((ptr as *mut T) as *mut u8, std::mem::size_of::<T>()) }
 }
 
-fn read_header(file: &fs::File) -> Result<Header> {
+fn read_header<T: ReadAt>(file: &T) -> Result<Header> {
     let mut buf = Header::default();
     file.read_exact_at(struct_to_mut_slice(&mut buf), 0)?;
     Ok(buf)
 }
 
-pub fn open_file<P: AsRef<std::path::Path>>(path: P, key: Option<&[u8]>, nonce: Option<&[u8]>) -> Result<Image> {
-    let file = fs::File::open(path)?;
+pub trait ReadAt {
+    fn read_at(&self, buf: &mut [u8], offset: u64) -> Result<usize>;
 
+    fn read_exact_at(&self, mut buf: &mut [u8], mut offset: u64) -> Result<()> {
+        while !buf.is_empty() {
+            match self.read_at(buf, offset) {
+                Ok(0) => break,
+                Ok(n) => {
+                    let tmp = buf;
+                    buf = &mut tmp[n..];
+                    offset += n as u64;
+                }
+                Err(Error::IO(ref e)) if e.kind() == io::ErrorKind::Interrupted => {}
+                Err(e) => return Err(e),
+            }
+        }
+        if !buf.is_empty() {
+            Err(Error::IO(io::Error::from(io::ErrorKind::UnexpectedEof)))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl<T> ReadAt for T
+where T: FileExt,
+{
+    fn read_at(&self, buf: &mut [u8], offset: u64) -> Result<usize> {
+        Ok(FileExt::read_at(self, buf, offset)?)
+    }
+}
+
+pub fn open_file<F: ReadAt + 'static>(file: F, key: Option<&[u8]>, nonce: Option<&[u8]>) -> Result<Image> {
     let header = read_header(&file)?;
 
     if header.magic != MAGIC {
@@ -211,8 +239,8 @@ pub fn open_file<P: AsRef<std::path::Path>>(path: P, key: Option<&[u8]>, nonce: 
         return Err(Error::Format("Unsupported minor version".into()));
     }
 
-    let stream: Box<dyn Decrypter> = match EncryptionType::try_from(header.encryption_type)? {
-        EncryptionType::None => Box::new(crypto::EncryptNone::new(file)),
+    let stream: Box<dyn ReadAt> = match EncryptionType::try_from(header.encryption_type)? {
+        EncryptionType::None => Box::new(file),
         EncryptionType::ChaCha20 => {
             if let Some(key) = key {
                 if let Some(nonce) = nonce {
