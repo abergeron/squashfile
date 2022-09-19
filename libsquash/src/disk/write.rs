@@ -71,7 +71,7 @@ fn write_directory<P: AsRef<Path>, S: Write + Seek>(dir: P, out: &mut S) -> Resu
             write_directory(entry.path(), out)?
         } else {
             return Err(Error::InvalidOperation(
-                format!("Unsupported file type {ft:?}").into(),
+                "Unsupported file type",
             ));
         };
         entries.push(disk::Dirent {
@@ -107,7 +107,7 @@ fn write_directory<P: AsRef<Path>, S: Write + Seek>(dir: P, out: &mut S) -> Resu
 
 pub fn write_image<P: AsRef<Path>, S: Write + Seek>(source: P, out: &mut S) -> Result<()> {
     if !fs::metadata(&source)?.is_dir() {
-        return Err(Error::InvalidOperation("root is not a directory".into()));
+        return Err(Error::InvalidOperation("root is not a directory"));
     }
     // Skip the header for now
     out.seek(io::SeekFrom::Start(

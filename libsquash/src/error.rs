@@ -5,13 +5,13 @@ pub enum Error {
     #[error("IO error")]
     IO(#[from] io::Error),
     #[error("Crypto error")]
-    Crypto(String),
+    Crypto(&'static str),
     #[error("Decompression error")]
-    Compression(String),
+    Compression(&'static str),
     #[error("Invalid value: {0}")]
-    Format(String),
+    Format(&'static str),
     #[error("Value out of bounds: {0}")]
-    Bounds(String),
+    Bounds(&'static str),
     #[error("Invalid operation: {0}")]
-    InvalidOperation(String),
+    InvalidOperation(&'static str),
 }

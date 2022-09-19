@@ -204,7 +204,7 @@ impl FS {
     pub fn get_root(&self) -> Result<Directory> {
         let inode = self.img.root_inode()?;
         if inode.inode_type()? != disk::InodeType::Directory {
-            return Err(Error::Format("root inode is not a directory".into()));
+            return Err(Error::Format("root inode is not a directory"));
         }
         Ok(Directory::new(inode, self.img.clone()))
     }
@@ -246,7 +246,7 @@ fn resolve_path<P: AsRef<[u8]>>(
     for elem in path.split(|c| c == &b'/') {
         if cur.inode_type()? != disk::InodeType::Directory {
             return Err(Error::InvalidOperation(
-                "path traversal met non-directory".into(),
+                "path traversal met non-directory",
             ));
         }
         if elem.len() == 0 || elem == [b'.'] {

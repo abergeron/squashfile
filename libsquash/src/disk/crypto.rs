@@ -22,10 +22,10 @@ const CHACHA20_REKEY_PERIOD: u64 = 4_294_967_296; // 2**32
 impl<F> EncryptChaCha20<F> {
     pub fn new(f: F, key: &[u8], nonce_prefix: &[u8]) -> Result<Self> {
         if key.len() != ChaCha20::key_size() {
-            return Err(Error::Crypto("Invalid key length".into()));
+            return Err(Error::Crypto("Invalid key length"));
         }
         if nonce_prefix.len() != ChaCha20::iv_size() - 8 {
-            return Err(Error::Crypto("Invalid nonce_prefix length".into()));
+            return Err(Error::Crypto("Invalid nonce_prefix length"));
         }
         Ok(EncryptChaCha20 {
             f: f,
@@ -59,7 +59,7 @@ impl<F: ReadAt> ReadAt for EncryptChaCha20<F> {
             let mut crypto = ChaCha20::new(&self.key, &nonce);
             crypto
                 .try_apply_keystream(b)
-                .map_err(|_| Error::Crypto("Decrypting error".into()))?;
+                .map_err(|_| Error::Crypto("Decrypting error"))?;
             len -= l;
             pos += l;
         }

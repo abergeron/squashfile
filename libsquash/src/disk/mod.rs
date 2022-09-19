@@ -72,7 +72,7 @@ impl TryFrom<u8> for EncryptionType {
         match val {
             0 => Ok(EncryptionType::None),
             1 => Ok(EncryptionType::ChaCha20),
-            _ => Err(Error::Format("EncryptionType".into())),
+            _ => Err(Error::Format("EncryptionType")),
         }
     }
 }
@@ -96,7 +96,7 @@ impl TryFrom<u8> for CompressionType {
     fn try_from(val: u8) -> Result<Self> {
         match val {
             0 => Ok(CompressionType::None),
-            _ => Err(Error::Format("CompressionType".into())),
+            _ => Err(Error::Format("CompressionType")),
         }
     }
 }
@@ -139,7 +139,7 @@ impl TryFrom<u8> for InodeType {
             0 => Ok(InodeType::Directory),
             1 => Ok(InodeType::File),
             2 => Ok(InodeType::Symlink),
-            _ => Err(Error::Format("InodeType".into())),
+            _ => Err(Error::Format("InodeType")),
         }
     }
 }
@@ -233,15 +233,15 @@ pub fn open_file<F: ReadAt + 'static>(
     let header = read_header(&file)?;
 
     if header.magic != MAGIC {
-        return Err(Error::Format("Wrong magic".into()));
+        return Err(Error::Format("Wrong magic"));
     }
 
     if header.version_major != VERSION_MAJOR {
-        return Err(Error::Format("Unsupported major version".into()));
+        return Err(Error::Format("Unsupported major version"));
     }
 
     if header.version_minor != VERSION_MINOR {
-        return Err(Error::Format("Unsupported minor version".into()));
+        return Err(Error::Format("Unsupported minor version"));
     }
 
     let stream: Box<dyn ReadAt> = match EncryptionType::try_from(header.encryption_type)? {
@@ -251,17 +251,17 @@ pub fn open_file<F: ReadAt + 'static>(
                 if let Some(nonce) = nonce {
                     Box::new(crypto::EncryptChaCha20::new(file, key, nonce)?)
                 } else {
-                    return Err(Error::Crypto("No provided nonce".into()));
+                    return Err(Error::Crypto("No provided nonce"));
                 }
             } else {
-                return Err(Error::Crypto("No provided key".into()));
+                return Err(Error::Crypto("No provided key"));
             }
         }
     };
 
     let comp_type = CompressionType::try_from(header.compression_type)?;
     if comp_type != CompressionType::None {
-        return Err(Error::Bounds("Unsupported compression type".into()));
+        return Err(Error::Bounds("Unsupported compression type"));
     }
 
     Ok(Image {
@@ -288,12 +288,12 @@ impl Inode {
     pub fn read_dirent(&self, pos: u64, img: &Image) -> Result<Dirent> {
         if self.inode_type()? != InodeType::Directory {
             return Err(Error::InvalidOperation(
-                "Reading dirents from non-directory".into(),
+                "Reading dirents from non-directory",
             ));
         }
         let offset = u64::from(self.offset) + (pos * std::mem::size_of::<Dirent>() as u64);
         if offset > self.size() {
-            return Err(Error::Bounds("dirent pos is beyond the directory".into()));
+            return Err(Error::Bounds("dirent pos is beyond the directory"));
         }
         img.read_dirent(offset)
     }
