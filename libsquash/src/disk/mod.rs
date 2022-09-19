@@ -291,11 +291,11 @@ impl Inode {
                 "Reading dirents from non-directory",
             ));
         }
-        let offset = u64::from(self.offset) + (pos * std::mem::size_of::<Dirent>() as u64);
+        let offset = pos * std::mem::size_of::<Dirent>() as u64;
         if offset > self.size() {
             return Err(Error::Bounds("dirent pos is beyond the directory"));
         }
-        img.read_dirent(offset)
+        img.read_dirent(offset + u64::from(self.offset))
     }
 
     pub fn read_at(&self, buf: &mut [u8], off: u64, img: &Image) -> Result<()> {
@@ -345,7 +345,7 @@ impl Image {
             // XXX: will this infinite loop on EOF?
             let read = self.file.read_at(&mut tmp_read, off)?;
             // In case of a short read
-            let tmp = &tmp_read[..=read];
+            let tmp = &tmp_read[..read];
             off += read as u64;
             match memchr(0, &tmp) {
                 Some(i) => {

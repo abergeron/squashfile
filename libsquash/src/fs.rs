@@ -156,7 +156,8 @@ impl Symlink {
     }
 
     pub fn get_link(&self) -> Result<Vec<u8>> {
-        let mut res = Vec::with_capacity(self.inode.size() as usize);
+        let sz = self.inode.size() as usize;
+        let mut res = vec![0; sz];
         self.inode
             .read_at(res.as_mut_slice(), 0, self.img.as_ref())?;
         Ok(res)
