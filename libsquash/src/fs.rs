@@ -11,6 +11,11 @@ use std::sync::Arc;
 
 type Result<T> = std::result::Result<T, Error>;
 
+// This is relatively low because we deal with it by recursion and
+// I don't want to blow the stack.
+const LINK_LOOP_MAX: u16 = 100;
+
+
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct FileType {
     ty: disk::InodeType,
@@ -238,7 +243,11 @@ fn resolve_path<P: AsRef<[u8]>>(
     img: &disk::Image,
     root: &disk::Inode,
     path: P,
+    count: u16,
 ) -> Result<Option<disk::Inode>> {
+    if count > LINK_LOOP_MAX {
+        return Err(Error::Bounds("maximum symlink loop count encoutered"));
+    }
     let path: &[u8] = path.as_ref();
     let mut cur = *root;
     if path[0] == b'/' {
@@ -264,7 +273,7 @@ fn resolve_path<P: AsRef<[u8]>>(
         if new.inode_type()? == disk::InodeType::Symlink {
             let mut link_path = Vec::with_capacity(new.size() as usize);
             new.read_at(link_path.as_mut_slice(), 0, &img)?;
-            cur = match resolve_path(img, &cur, link_path)? {
+            cur = match resolve_path(img, &cur, link_path, count + 1)? {
                 None => return Ok(None),
                 Some(i) => i,
             };
@@ -280,7 +289,7 @@ fn resolve_dir<P: AsRef<[u8]>>(
     root: &Directory,
     path: P,
 ) -> Result<Option<FSItem>> {
-    let inode = resolve_path(img.as_ref(), &root.inode, path)?;
+    let inode = resolve_path(img.as_ref(), &root.inode, path, 0)?;
     match inode {
         None => Ok(None),
         Some(i) => Ok(Some(new_fsitem(img, i)?)),
