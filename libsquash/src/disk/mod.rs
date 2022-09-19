@@ -16,6 +16,7 @@ use crate::error::Error;
 use std::convert::TryFrom;
 use std::ffi::CString;
 use std::io;
+use std::cmp::min;
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -216,12 +217,19 @@ pub trait ReadAt {
     }
 }
 
-impl<T> ReadAt for T
-where
-    T: FileExt,
+impl ReadAt for std::fs::File
 {
     fn read_at(&self, buf: &mut [u8], offset: u64) -> Result<usize> {
         Ok(FileExt::read_at(self, buf, offset)?)
+    }
+}
+
+impl ReadAt for Vec<u8> {
+    fn read_at(&self, buf: &mut [u8], offset: u64) -> Result<usize> {
+        let s = self.as_slice();
+        let sz = min(buf.len(), s.len() - offset as usize);
+        buf[..sz].copy_from_slice(&s[offset as usize..sz]);
+        Ok(sz)
     }
 }
 

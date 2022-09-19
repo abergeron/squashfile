@@ -11,3 +11,11 @@ memchr = "2.5"
 thiserror = "1.0"
 clap = { version = "3.2", features = ["derive"] }
 chacha20 = "0.9"
+afl = { version = "*", optional = true }
+
+[features]
+fuzz = ["dep:afl"]
+
+[[bin]]
+name = "squashfuzz"
+required-features = ["fuzz"]

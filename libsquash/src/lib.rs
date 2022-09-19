@@ -51,6 +51,12 @@ pub fn extract_image_file<P: AsRef<Path>, T: AsRef<Path>>(image: &P, target: &T)
     extract(&fs.get_root()?, target)
 }
 
+pub fn extract_image<T: AsRef<Path>>(image_data: &[u8], target: &T) -> Result<()> {
+    let tmp = image_data.to_vec();
+    let fs = fs::FS::open(tmp, None, None)?;
+    extract(&fs.get_root()?, target)
+}
+
 pub fn open_image_file<P: AsRef<Path>>(
     img: P,
     key: Option<&[u8]>,
