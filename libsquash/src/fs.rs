@@ -14,6 +14,8 @@ type Result<T> = std::result::Result<T, Error>;
 // This is relatively low because we deal with it by recursion and
 // I don't want to blow the stack.
 const LINK_LOOP_MAX: u16 = 100;
+// Max length of a symlink target
+const LINK_TARGET_MAX: usize = 1024;
 
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -161,12 +163,18 @@ impl Symlink {
     }
 
     pub fn get_link(&self) -> Result<Vec<u8>> {
-        let sz = self.inode.size() as usize;
-        let mut res = vec![0; sz];
-        self.inode
-            .read_at(res.as_mut_slice(), 0, self.img.as_ref())?;
-        Ok(res)
+        get_link(self.inode, self.img.as_ref())
     }
+}
+
+fn get_link(inode: disk::Inode, img: &disk::Image) -> Result<Vec<u8>> {
+    let sz = inode.size() as usize;
+    if sz > LINK_TARGET_MAX {
+	return Err(Error::Bounds("link target too long"));
+    }
+    let mut res = vec![0; sz];
+    inode.read_at(res.as_mut_slice(), 0, img)?;
+    Ok(res)
 }
 
 impl Iterator for ReadDir {
@@ -271,8 +279,7 @@ fn resolve_path<P: AsRef<[u8]>>(
             Some(i) => i,
         };
         if new.inode_type()? == disk::InodeType::Symlink {
-            let mut link_path = Vec::with_capacity(new.size() as usize);
-            new.read_at(link_path.as_mut_slice(), 0, &img)?;
+            let link_path = get_link(new, &img)?;
             cur = match resolve_path(img, &cur, link_path, count + 1)? {
                 None => return Ok(None),
                 Some(i) => i,
