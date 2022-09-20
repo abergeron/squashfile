@@ -28,11 +28,9 @@ fn extract<P: AsRef<Path>>(dir: &fs::Directory, targ: P) -> Result<()> {
         let dent = e?;
         let subp = target.join(OsStr::from_bytes(&dent.file_name()?.as_bytes()));
         match dent.item()? {
-            fs::FSItem::File(f) => {
-                // This should use a fixed-size buffer and extract by chunks
-                let mut buf = vec![0; f.size() as usize];
-                f.read_at(buf.as_mut_slice(), 0)?;
-                std::fs::write(&subp, buf)?;
+            fs::FSItem::File(ref mut f) => {
+                let mut t = std::fs::File::create(&subp)?;
+                std::io::copy(f, &mut t)?;
             }
             fs::FSItem::Directory(d) => {
                 std::fs::create_dir(&subp)?;
