@@ -227,8 +227,12 @@ impl ReadAt for std::fs::File
 impl ReadAt for Vec<u8> {
     fn read_at(&self, buf: &mut [u8], offset: u64) -> Result<usize> {
         let s = self.as_slice();
+        if offset > s.len() as u64 {
+            return Ok(0);
+        }
         let sz = min(buf.len(), s.len() - offset as usize);
-        buf[..sz].copy_from_slice(&s[offset as usize..sz]);
+        let off = offset as usize;
+        buf[..sz].copy_from_slice(&s[off..off+sz]);
         Ok(sz)
     }
 }
