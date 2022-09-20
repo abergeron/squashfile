@@ -310,7 +310,16 @@ impl Inode {
         img.read_dirent(offset + u64::from(self.offset))
     }
 
-    pub fn read_at(&self, buf: &mut [u8], off: u64, img: &Image) -> Result<()> {
+    pub fn read_at(&self, buf: &mut [u8], off: u64, img: &Image) -> Result<usize> {
+        if off > self.size() {
+            return Ok(0);
+        }
+        let sz = min(buf.len() as u64, self.size() - off) as usize;
+        img.read_file(&mut buf[..sz], u64::from(self.offset) + off)?;
+        Ok(sz)
+    }
+
+    pub fn read_exact_at(&self, buf: &mut [u8], off: u64, img: &Image) -> Result<()> {
         if off + buf.len() as u64 > self.size() {
             Err(io::Error::from(io::ErrorKind::UnexpectedEof).into())
         } else {

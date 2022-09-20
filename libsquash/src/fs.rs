@@ -8,6 +8,7 @@ use std::ffi::CString;
 use std::iter::Iterator;
 use std::path;
 use std::sync::Arc;
+use std::io;
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -39,6 +40,7 @@ pub struct Directory {
 pub struct File {
     img: Arc<disk::Image>,
     inode: disk::Inode,
+    pos: u64,
 }
 
 #[derive(Clone)]
@@ -141,6 +143,7 @@ impl File {
         File {
             inode: inode,
             img: img,
+            pos: 0,
         }
     }
 
@@ -148,8 +151,63 @@ impl File {
         self.inode.size()
     }
 
-    pub fn read_at(&self, buf: &mut [u8], offset: u64) -> Result<()> {
+    pub fn read_at(&self, buf: &mut [u8], offset: u64) -> Result<usize> {
         self.inode.read_at(buf, offset, self.img.as_ref())
+    }
+
+    pub fn read_exact_at(&self, buf: &mut [u8], offset: u64) -> Result<()> {
+        self.inode.read_exact_at(buf, offset, self.img.as_ref())
+    }
+}
+
+fn convert_to_io_error(e: Error) -> io::Error {
+    match e {
+        Error::IO(ioe) => ioe,
+        _ => io::Error::new(io::ErrorKind::Other, e),
+    }
+}
+
+
+impl io::Read for File {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let sz = self.read_at(buf, self.pos).map_err(convert_to_io_error)?;
+        self.pos += sz as u64;
+        Ok(sz)
+    }
+}
+
+fn checked_sub(a: u64, b: i64) -> Option<u64> {
+    (if b > 0 {
+        u64::checked_sub
+    } else {
+        u64::checked_add
+    })(a, b.abs() as u64)
+}
+
+impl io::Seek for File {
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        match pos {
+            io::SeekFrom::Start(s) => self.pos = s,
+            io::SeekFrom::End(s) => {
+                if let Some(v) = checked_sub(self.size(), s) {
+                    self.pos = v
+                } else {
+                    return Err(io::Error::from(io::ErrorKind::InvalidInput))
+                }
+            },
+            io::SeekFrom::Current(s) => {
+                if let Some(v) = checked_sub(self.pos, s) {
+                    self.pos = v
+                } else {
+                    return Err(io::Error::from(io::ErrorKind::InvalidInput))
+                }
+            },
+        };
+        Ok(self.pos)
+    }
+
+    fn stream_position(&mut self) -> io::Result<u64> {
+        Ok(self.pos)
     }
 }
 
