@@ -363,8 +363,10 @@ impl Image {
         let mut tmp_read = [0; 32];
 
         loop {
-            // XXX: will this infinite loop on EOF?
             let read = self.file.read_at(&mut tmp_read, off)?;
+            if read == 0 {
+                return Err(Error::IO(io::Error::from(io::ErrorKind::UnexpectedEof)));
+            }
             // In case of a short read
             let tmp = &tmp_read[..read];
             off += read as u64;
