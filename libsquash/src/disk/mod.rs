@@ -220,7 +220,7 @@ pub trait ReadAt {
 impl ReadAt for std::fs::File
 {
     fn read_at(&self, buf: &mut [u8], offset: u64) -> Result<usize> {
-        Ok(FileExt::read_at(self, buf, offset)?)
+        FileExt::read_at(self, buf, offset).map_err(|e| e.into())
     }
 }
 
