@@ -9,8 +9,12 @@ edition = "2021"
 static_assertions = "1.1"
 memchr = "2.5"
 thiserror = "1.0"
-clap = { version = "3.2", features = ["derive"] }
+# For crypto
 chacha20 = { version = "0.9", features = ["std"] }
+# For CLI
+clap = { version = "3.2", features = ["derive"] }
+hex = "0.4"
+# For fuzzing
 afl = { version = "*", optional = true }
 
 [features]

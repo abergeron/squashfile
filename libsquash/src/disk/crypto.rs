@@ -3,8 +3,8 @@ use crate::Result;
 
 use crate::disk::ReadAt;
 use std::cmp::min;
-use std::io::{Write, Seek};
 use std::io;
+use std::io::{Seek, Write};
 
 extern crate chacha20;
 use chacha20::cipher::IvSizeUser;
@@ -16,6 +16,8 @@ use chacha20::ChaCha20;
 const CHACHA20_REKEY_PERIOD: u64 = 4_294_967_296; // 2**32
 const CHACHA20_BUFFER_SIZE: usize = 4096;
 
+pub type Key<'a> = Option<&'a [u8]>;
+
 pub struct EncryptChaCha20<F> {
     f: F,
     nonce_prefix: [u8; 4],
@@ -25,17 +27,19 @@ pub struct EncryptChaCha20<F> {
 }
 
 impl<F> EncryptChaCha20<F> {
-    pub fn new(f: F, key: &[u8], nonce_prefix: &[u8]) -> Result<Self> {
-        if key.len() != ChaCha20::key_size() {
+    pub fn new(f: F, k: Key) -> Result<Self> {
+        let key = match k {
+            None => return Err(Error::Crypto("No key provided")),
+            Some(k) => k,
+        };
+        if key.len() != ChaCha20::key_size() + ChaCha20::iv_size() - 8 {
             return Err(Error::Crypto("Invalid key length"));
         }
-        if nonce_prefix.len() != ChaCha20::iv_size() - 8 {
-            return Err(Error::Crypto("Invalid nonce_prefix length"));
-        }
+        let key_sz = ChaCha20::key_size();
         Ok(EncryptChaCha20 {
             f: f,
-            nonce_prefix: nonce_prefix.try_into().unwrap(),
-            key: *chacha20::Key::from_slice(key),
+            nonce_prefix: key[key_sz..].try_into().unwrap(),
+            key: *chacha20::Key::from_slice(&key[..key_sz]),
             pos: 0,
             buf: [0; CHACHA20_BUFFER_SIZE],
         })
@@ -84,11 +88,16 @@ impl<W: Write> Write for EncryptChaCha20<W> {
         let mut off = self.pos;
         while len > 0 {
             let p = off % CHACHA20_REKEY_PERIOD;
-            let l = min(len, min(CHACHA20_BUFFER_SIZE, (CHACHA20_REKEY_PERIOD - p) as usize));
+            let l = min(
+                len,
+                min(CHACHA20_BUFFER_SIZE, (CHACHA20_REKEY_PERIOD - p) as usize),
+            );
             let b = &buf[pos..pos + l];
             self.block_nonce(&mut nonce, off);
             let mut crypto = ChaCha20::new(&self.key, &nonce);
-            crypto.apply_keystream_b2b(b, &mut self.buf[..l]).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            crypto
+                .apply_keystream_b2b(b, &mut self.buf[..l])
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
             let sz = self.f.write(&self.buf[..l])?;
             self.pos += sz as u64;
             if sz == 0 {

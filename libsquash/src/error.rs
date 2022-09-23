@@ -1,9 +1,12 @@
+use hex;
 use std::io;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("IO error")]
     IO(#[from] io::Error),
+    #[error("Hex decode error")]
+    Hex(#[from] hex::FromHexError),
     #[error("Crypto error")]
     Crypto(&'static str),
     #[error("Decompression error")]

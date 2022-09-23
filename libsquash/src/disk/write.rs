@@ -7,28 +7,37 @@ use std::os::unix::ffi::OsStrExt;
 use crate::error::Error;
 type Result<T> = std::result::Result<T, Error>;
 use crate::disk;
+use disk::Key;
 
 use std::fs;
 use std::io;
 use std::path::Path;
 
+trait SeekWrite: Seek + Write {}
+
+impl<T: Seek + Write> SeekWrite for T {}
+
 fn struct_to_slice<T>(ptr: &T) -> &[u8] {
     unsafe { std::slice::from_raw_parts((ptr as *const T) as *const u8, std::mem::size_of::<T>()) }
 }
 
-fn write_header<S: Write + Seek>(out: &mut S, root_inode: u64) -> Result<()> {
+fn write_header<S: SeekWrite>(
+    out: &mut S,
+    root_inode: u64,
+    enc_type: disk::EncryptionType,
+) -> Result<()> {
     let mut header = disk::Header::default();
     header.magic = disk::MAGIC;
     header.root_inode = root_inode.into();
     header.version_major = disk::VERSION_MAJOR;
     header.version_minor = disk::VERSION_MINOR;
     header.compression_type = disk::CompressionType::None as u8;
-    header.encryption_type = disk::EncryptionType::None as u8;
+    header.encryption_type = enc_type as u8;
     out.write_all(struct_to_slice(&header))
         .map_err(|e| e.into())
 }
 
-fn write_file<P: AsRef<Path>, S: Write + Seek>(file: P, out: &mut S) -> Result<u64> {
+fn write_file<P: AsRef<Path>, S: SeekWrite>(file: P, out: &mut S) -> Result<u64> {
     let mut inode = disk::Inode::default();
     inode.offset = out.stream_position()?.into();
     inode.inode_type = disk::InodeType::File.into();
@@ -38,7 +47,7 @@ fn write_file<P: AsRef<Path>, S: Write + Seek>(file: P, out: &mut S) -> Result<u
     Ok(inode_pos)
 }
 
-fn write_symlink<P: AsRef<Path>, S: Write + Seek>(link: P, out: &mut S) -> Result<u64> {
+fn write_symlink<P: AsRef<Path>, S: SeekWrite>(link: P, out: &mut S) -> Result<u64> {
     let mut inode = disk::Inode::default();
     inode.offset = out.stream_position()?.into();
     inode.inode_type = disk::InodeType::Symlink.into();
@@ -51,7 +60,7 @@ fn write_symlink<P: AsRef<Path>, S: Write + Seek>(link: P, out: &mut S) -> Resul
     Ok(inode_pos)
 }
 
-fn write_directory<P: AsRef<Path>, S: Write + Seek>(dir: P, out: &mut S) -> Result<u64> {
+fn write_directory<P: AsRef<Path>, S: SeekWrite>(dir: P, out: &mut S) -> Result<u64> {
     let mut entries = Vec::new();
     let iter = fs::read_dir(dir)?;
     let tmp: std::result::Result<Vec<_>, io::Error> = iter.collect();
@@ -70,9 +79,7 @@ fn write_directory<P: AsRef<Path>, S: Write + Seek>(dir: P, out: &mut S) -> Resu
         } else if ft.is_dir() {
             write_directory(entry.path(), out)?
         } else {
-            return Err(Error::InvalidOperation(
-                "Unsupported file type",
-            ));
+            return Err(Error::InvalidOperation("Unsupported file type"));
         };
         entries.push(disk::Dirent {
             name: name_pos.into(),
@@ -105,7 +112,12 @@ fn write_directory<P: AsRef<Path>, S: Write + Seek>(dir: P, out: &mut S) -> Resu
     Ok(dir_inode_pos)
 }
 
-pub fn write_image<P: AsRef<Path>, S: Write + Seek>(source: P, out: &mut S) -> Result<()> {
+pub fn write_image<P: AsRef<Path>, S: Seek + Write>(
+    source: P,
+    mut out: S,
+    key: Key,
+    enc_type: disk::EncryptionType,
+) -> Result<()> {
     if !fs::metadata(&source)?.is_dir() {
         return Err(Error::InvalidOperation("root is not a directory"));
     }
@@ -115,16 +127,20 @@ pub fn write_image<P: AsRef<Path>, S: Write + Seek>(source: P, out: &mut S) -> R
     ))?;
 
     // wrap with encrypter eventually
-    let out_enc = out;
-    let root_inode = write_directory(&source, out_enc)?;
-
+    let mut out_enc: Box<dyn SeekWrite> = match enc_type {
+        disk::EncryptionType::None => Box::new(&mut out),
+        disk::EncryptionType::ChaCha20 => {
+            let enc = disk::crypto::EncryptChaCha20::new(&mut out, key)?;
+            Box::new(enc)
+        }
+    };
+    let root_inode = write_directory(&source, &mut out_enc)?;
     // Set the parent of the root inode to itself
     let root_inode_ref: disk::u64le = root_inode.into();
     out_enc.seek(io::SeekFrom::Start(root_inode))?;
     out_enc.write_all(struct_to_slice(&root_inode_ref))?;
+    drop(out_enc);
 
-    // Get the original steam back from the encrypter
-    let out = out_enc;
     out.rewind()?;
-    write_header(out, root_inode)
+    write_header(&mut out, root_inode, enc_type)
 }

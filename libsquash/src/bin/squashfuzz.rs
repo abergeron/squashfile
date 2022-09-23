@@ -3,7 +3,7 @@ extern crate afl;
 
 use libsquash::extract_image;
 
-use std::fs::{remove_dir_all, create_dir};
+use std::fs::{create_dir, remove_dir_all};
 
 fn main() {
     fuzz!(|data: &[u8]| {

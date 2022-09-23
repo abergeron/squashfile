@@ -6,6 +6,7 @@ pub mod write;
 mod tests;
 
 mod crypto;
+pub use crypto::Key;
 
 // This is for read_at/read_exact_at
 use std::os::unix::fs::FileExt;
@@ -13,10 +14,10 @@ use std::os::unix::fs::FileExt;
 use memchr::memchr;
 
 use crate::error::Error;
+use std::cmp::min;
 use std::convert::TryFrom;
 use std::ffi::CString;
 use std::io;
-use std::cmp::min;
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -61,7 +62,7 @@ impl From<u32> for u32le {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-enum EncryptionType {
+pub enum EncryptionType {
     None,
     ChaCha20,
 }
@@ -87,7 +88,7 @@ impl From<EncryptionType> for u8 {
     }
 }
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-enum CompressionType {
+pub enum CompressionType {
     None,
 }
 
@@ -217,8 +218,7 @@ pub trait ReadAt {
     }
 }
 
-impl ReadAt for std::fs::File
-{
+impl ReadAt for std::fs::File {
     fn read_at(&self, buf: &mut [u8], offset: u64) -> Result<usize> {
         FileExt::read_at(self, buf, offset).map_err(|e| e.into())
     }
@@ -232,16 +232,12 @@ impl ReadAt for Vec<u8> {
         }
         let sz = min(buf.len(), s.len() - offset as usize);
         let off = offset as usize;
-        buf[..sz].copy_from_slice(&s[off..off+sz]);
+        buf[..sz].copy_from_slice(&s[off..off + sz]);
         Ok(sz)
     }
 }
 
-pub fn open_file<F: ReadAt + 'static>(
-    file: F,
-    key: Option<&[u8]>,
-    nonce: Option<&[u8]>,
-) -> Result<Image> {
+pub fn open_file<F: ReadAt + 'static>(file: F, key: Key) -> Result<Image> {
     let header = read_header(&file)?;
 
     if header.magic != MAGIC {
@@ -258,17 +254,7 @@ pub fn open_file<F: ReadAt + 'static>(
 
     let stream: Box<dyn ReadAt> = match EncryptionType::try_from(header.encryption_type)? {
         EncryptionType::None => Box::new(file),
-        EncryptionType::ChaCha20 => {
-            if let Some(key) = key {
-                if let Some(nonce) = nonce {
-                    Box::new(crypto::EncryptChaCha20::new(file, key, nonce)?)
-                } else {
-                    return Err(Error::Crypto("No provided nonce"));
-                }
-            } else {
-                return Err(Error::Crypto("No provided key"));
-            }
-        }
+        EncryptionType::ChaCha20 => Box::new(crypto::EncryptChaCha20::new(file, key)?),
     };
 
     let comp_type = CompressionType::try_from(header.compression_type)?;

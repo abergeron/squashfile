@@ -1,14 +1,15 @@
 // std::fs-like interface (read-only of course)
 
 use crate::disk;
+use crate::disk::Key;
 use crate::error::Error;
 
 use std::cmp::Ordering;
 use std::ffi::CString;
+use std::io;
 use std::iter::Iterator;
 use std::path;
 use std::sync::Arc;
-use std::io;
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -17,7 +18,6 @@ type Result<T> = std::result::Result<T, Error>;
 const LINK_LOOP_MAX: u16 = 100;
 // Max length of a symlink target
 const LINK_TARGET_MAX: usize = 1024;
-
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct FileType {
@@ -167,7 +167,6 @@ fn convert_to_io_error(e: Error) -> io::Error {
     }
 }
 
-
 impl io::Read for File {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let sz = self.read_at(buf, self.pos).map_err(convert_to_io_error)?;
@@ -192,16 +191,16 @@ impl io::Seek for File {
                 if let Some(v) = checked_sub(self.size(), s) {
                     self.pos = v
                 } else {
-                    return Err(io::Error::from(io::ErrorKind::InvalidInput))
+                    return Err(io::Error::from(io::ErrorKind::InvalidInput));
                 }
-            },
+            }
             io::SeekFrom::Current(s) => {
                 if let Some(v) = checked_sub(self.pos, s) {
                     self.pos = v
                 } else {
-                    return Err(io::Error::from(io::ErrorKind::InvalidInput))
+                    return Err(io::Error::from(io::ErrorKind::InvalidInput));
                 }
-            },
+            }
         };
         Ok(self.pos)
     }
@@ -228,7 +227,7 @@ impl Symlink {
 fn get_link(inode: disk::Inode, img: &disk::Image) -> Result<Vec<u8>> {
     let sz = inode.size() as usize;
     if sz > LINK_TARGET_MAX {
-	return Err(Error::Bounds("link target too long"));
+        return Err(Error::Bounds("link target too long"));
     }
     let mut res = vec![0; sz];
     inode.read_at(res.as_mut_slice(), 0, img)?;
@@ -255,22 +254,14 @@ impl Iterator for ReadDir {
 }
 
 impl FS {
-    pub fn open<F: disk::ReadAt + 'static>(
-        f: F,
-        key: Option<&[u8]>,
-        nonce: Option<&[u8]>,
-    ) -> Result<FS> {
+    pub fn open<F: disk::ReadAt + 'static>(f: F, key: Key) -> Result<FS> {
         Ok(FS {
-            img: Arc::new(disk::open_file(f, key, nonce)?),
+            img: Arc::new(disk::open_file(f, key)?),
         })
     }
 
-    pub fn open_file<P: AsRef<path::Path>>(
-        path: P,
-        key: Option<&[u8]>,
-        nonce: Option<&[u8]>,
-    ) -> Result<FS> {
-        FS::open(std::fs::File::open(path)?, key, nonce)
+    pub fn open_file<P: AsRef<path::Path>>(path: P, key: Key) -> Result<FS> {
+        FS::open(std::fs::File::open(path)?, key)
     }
 
     pub fn get_root(&self) -> Result<Directory> {
@@ -321,9 +312,7 @@ fn resolve_path<P: AsRef<[u8]>>(
     }
     for elem in path.split(|c| c == &b'/') {
         if cur.inode_type()? != disk::InodeType::Directory {
-            return Err(Error::InvalidOperation(
-                "path traversal met non-directory",
-            ));
+            return Err(Error::InvalidOperation("path traversal met non-directory"));
         }
         if elem.len() == 0 || elem == [b'.'] {
             continue;

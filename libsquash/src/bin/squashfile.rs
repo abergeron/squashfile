@@ -1,8 +1,18 @@
 use clap::{Args, Parser, Subcommand};
 
-use libsquash::{write_image_file, extract_image_file, Result};
+use libsquash::{extract_image_file, write_image_file, EncryptionType, Result};
 
 use std::path::PathBuf;
+
+extern crate hex;
+
+fn enc_parse(s: &str) -> std::result::Result<EncryptionType, String> {
+    Ok(match s {
+        "chacha20" => EncryptionType::ChaCha20,
+        "none" => EncryptionType::None,
+        _ => return Err("Invalid encryption type".into()),
+    })
+}
 
 #[derive(Parser)]
 #[clap(rename_all = "lower")]
@@ -17,6 +27,10 @@ struct CreateArgs {
     source: PathBuf,
     #[clap(short, long, value_parser)]
     image: PathBuf,
+    #[clap(short, long, value_parser)]
+    key: Option<String>,
+    #[clap(short, long, value_parser = enc_parse, default_value = "none")]
+    enc_type: EncryptionType,
 }
 
 #[derive(Args)]
@@ -25,6 +39,8 @@ struct ExtractArgs {
     target: PathBuf,
     #[clap(short, long, value_parser)]
     image: PathBuf,
+    #[clap(short, long, value_parser)]
+    key: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -34,11 +50,19 @@ enum Command {
 }
 
 fn create(args: &CreateArgs) -> Result<()> {
-    write_image_file(&args.source, &args.image)
+    let key = match args.key {
+        Some(ref s) => Some(hex::decode(s)?),
+        None => None,
+    };
+    write_image_file(&args.source, &args.image, key.as_deref(), args.enc_type)
 }
 
 fn extract(args: &ExtractArgs) -> Result<()> {
-    extract_image_file(&args.image, &args.target)
+    let key = match args.key {
+        Some(ref s) => Some(hex::decode(s)?),
+        None => None,
+    };
+    extract_image_file(&args.image, &args.target, key.as_deref())
 }
 
 fn main() -> Result<()> {
