@@ -4,6 +4,7 @@ extern crate static_assertions;
 use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
+use std::io::Cursor;
 
 mod disk;
 pub mod error;
@@ -56,8 +57,12 @@ pub fn extract_image_file<P: AsRef<Path>, T: AsRef<Path>>(
     extract(&fs.get_root()?, target)
 }
 
-pub fn extract_image<T: AsRef<Path>>(image_data: &[u8], target: &T, key: Key) -> Result<()> {
-    let tmp = image_data.to_vec();
+pub fn extract_image<T: AsRef<Path>>(
+    image_data: &[u8],
+    target: &T,
+    key: Key,
+) -> Result<()> {
+    let tmp = Cursor::new(image_data.to_vec());
     let fs = fs::FS::open(tmp, key)?;
     extract(&fs.get_root()?, target)
 }

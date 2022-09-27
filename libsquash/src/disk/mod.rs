@@ -18,6 +18,7 @@ use std::cmp::min;
 use std::convert::TryFrom;
 use std::ffi::CString;
 use std::io;
+use std::io::Cursor;
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -224,9 +225,12 @@ impl ReadAt for std::fs::File {
     }
 }
 
-impl ReadAt for Vec<u8> {
+impl<T> ReadAt for Cursor<T>
+where
+    T: AsRef<[u8]>,
+{
     fn read_at(&self, buf: &mut [u8], offset: u64) -> Result<usize> {
-        let s = self.as_slice();
+        let s = self.get_ref().as_ref();
         if offset > s.len() as u64 {
             return Ok(0);
         }

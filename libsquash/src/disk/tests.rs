@@ -1,7 +1,6 @@
 use std::matches;
 
-use crate::error::Error;
-type Result<T> = std::result::Result<T, Error>;
+use crate::Result;
 
 use crate::disk;
 use crate::disk::u32le;
@@ -108,13 +107,15 @@ fn test_inode_type() {
 
 #[test]
 fn test_open() {
-    let img = disk::open_file("test_data/small.sqh", None, None);
+    let f = std::fs::File::open("test_data/small.sqh").unwrap();
+    let img = disk::open_file(f, None);
     assert!(matches!(img, Ok(_)));
 }
 
 #[test]
 fn test_get_root() {
-    let img = disk::open_file("test_data/small.sqh", None, None).unwrap();
+    let f = std::fs::File::open("test_data/small.sqh").unwrap();
+    let img = disk::open_file(f, None).unwrap();
 
     let root = img.root_inode();
     assert!(matches!(root, Ok(_)));
