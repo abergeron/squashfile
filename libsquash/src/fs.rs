@@ -58,7 +58,9 @@ pub enum FSItem {
 fn new_fsitem(img: Arc<disk::Image>, inode: disk::Inode) -> Result<FSItem> {
     Ok(match inode.inode_type()? {
         disk::InodeType::File => FSItem::File(File::new(inode, img)),
-        disk::InodeType::Directory => FSItem::Directory(Directory::new(inode, img)),
+        disk::InodeType::Directory => {
+            FSItem::Directory(Directory::new(inode, img))
+        }
         disk::InodeType::Symlink => FSItem::Symlink(Symlink::new(inode, img)),
     })
 }
@@ -103,7 +105,9 @@ impl DirEntry {
 
 impl Directory {
     fn new(inode: disk::Inode, img: Arc<disk::Image>) -> Self {
-        std::debug_assert!(inode.inode_type().expect("") == disk::InodeType::Directory);
+        std::debug_assert!(
+            inode.inode_type().expect("") == disk::InodeType::Directory
+        );
         Directory {
             inode: inode,
             img: img,
@@ -139,7 +143,9 @@ impl Directory {
 
 impl File {
     fn new(inode: disk::Inode, img: Arc<disk::Image>) -> Self {
-        std::debug_assert!(inode.inode_type().expect("") == disk::InodeType::File);
+        std::debug_assert!(
+            inode.inode_type().expect("") == disk::InodeType::File
+        );
         File {
             inode: inode,
             img: img,
@@ -212,7 +218,9 @@ impl io::Seek for File {
 
 impl Symlink {
     fn new(inode: disk::Inode, img: Arc<disk::Image>) -> Self {
-        std::debug_assert!(inode.inode_type().expect("") == disk::InodeType::Symlink);
+        std::debug_assert!(
+            inode.inode_type().expect("") == disk::InodeType::Symlink
+        );
         Symlink {
             inode: inode,
             img: img,
@@ -312,7 +320,9 @@ fn resolve_path<P: AsRef<[u8]>>(
     }
     for elem in path.split(|c| c == &b'/') {
         if cur.inode_type()? != disk::InodeType::Directory {
-            return Err(Error::InvalidOperation("path traversal met non-directory"));
+            return Err(Error::InvalidOperation(
+                "path traversal met non-directory",
+            ));
         }
         if elem.len() == 0 || elem == [b'.'] {
             continue;

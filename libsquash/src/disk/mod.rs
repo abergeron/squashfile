@@ -186,7 +186,12 @@ pub struct Image {
 }
 
 fn struct_to_mut_slice<T>(ptr: &mut T) -> &mut [u8] {
-    unsafe { std::slice::from_raw_parts_mut((ptr as *mut T) as *mut u8, std::mem::size_of::<T>()) }
+    unsafe {
+        std::slice::from_raw_parts_mut(
+            (ptr as *mut T) as *mut u8,
+            std::mem::size_of::<T>(),
+        )
+    }
 }
 
 fn read_header<T: ReadAt>(file: &T) -> Result<Header> {
@@ -207,7 +212,8 @@ pub trait ReadAt {
                     buf = &mut tmp[n..];
                     offset += n as u64;
                 }
-                Err(Error::IO(ref e)) if e.kind() == io::ErrorKind::Interrupted => {}
+                Err(Error::IO(ref e))
+                    if e.kind() == io::ErrorKind::Interrupted => {}
                 Err(e) => return Err(e),
             }
         }
@@ -256,10 +262,13 @@ pub fn open_file<F: ReadAt + 'static>(file: F, key: Key) -> Result<Image> {
         return Err(Error::Format("Unsupported minor version"));
     }
 
-    let stream: Box<dyn ReadAt> = match EncryptionType::try_from(header.encryption_type)? {
-        EncryptionType::None => Box::new(file),
-        EncryptionType::ChaCha20 => Box::new(crypto::EncryptChaCha20::new(file, key)?),
-    };
+    let stream: Box<dyn ReadAt> =
+        match EncryptionType::try_from(header.encryption_type)? {
+            EncryptionType::None => Box::new(file),
+            EncryptionType::ChaCha20 => {
+                Box::new(crypto::EncryptChaCha20::new(file, key)?)
+            }
+        };
 
     let comp_type = CompressionType::try_from(header.compression_type)?;
     if comp_type != CompressionType::None {
@@ -300,7 +309,12 @@ impl Inode {
         img.read_dirent(offset + u64::from(self.offset))
     }
 
-    pub fn read_at(&self, buf: &mut [u8], off: u64, img: &Image) -> Result<usize> {
+    pub fn read_at(
+        &self,
+        buf: &mut [u8],
+        off: u64,
+        img: &Image,
+    ) -> Result<usize> {
         if off > self.size() {
             return Ok(0);
         }
@@ -309,7 +323,12 @@ impl Inode {
         Ok(sz)
     }
 
-    pub fn read_exact_at(&self, buf: &mut [u8], off: u64, img: &Image) -> Result<()> {
+    pub fn read_exact_at(
+        &self,
+        buf: &mut [u8],
+        off: u64,
+        img: &Image,
+    ) -> Result<()> {
         if off + buf.len() as u64 > self.size() {
             Err(io::Error::from(io::ErrorKind::UnexpectedEof).into())
         } else {
@@ -355,7 +374,9 @@ impl Image {
         loop {
             let read = self.file.read_at(&mut tmp_read, off)?;
             if read == 0 {
-                return Err(Error::IO(io::Error::from(io::ErrorKind::UnexpectedEof)));
+                return Err(Error::IO(io::Error::from(
+                    io::ErrorKind::UnexpectedEof,
+                )));
             }
             // In case of a short read
             let tmp = &tmp_read[..read];
@@ -363,7 +384,9 @@ impl Image {
             match memchr(0, &tmp) {
                 Some(i) => {
                     buf.extend_from_slice(&tmp[..=i]);
-                    return Ok(unsafe { CString::from_vec_with_nul_unchecked(buf) });
+                    return Ok(unsafe {
+                        CString::from_vec_with_nul_unchecked(buf)
+                    });
                 }
                 None => buf.extend_from_slice(tmp),
             }

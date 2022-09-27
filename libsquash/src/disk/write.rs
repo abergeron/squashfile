@@ -18,7 +18,12 @@ trait SeekWrite: Seek + Write {}
 impl<T: Seek + Write> SeekWrite for T {}
 
 fn struct_to_slice<T>(ptr: &T) -> &[u8] {
-    unsafe { std::slice::from_raw_parts((ptr as *const T) as *const u8, std::mem::size_of::<T>()) }
+    unsafe {
+        std::slice::from_raw_parts(
+            (ptr as *const T) as *const u8,
+            std::mem::size_of::<T>(),
+        )
+    }
 }
 
 fn write_header<S: SeekWrite>(
@@ -37,7 +42,10 @@ fn write_header<S: SeekWrite>(
         .map_err(|e| e.into())
 }
 
-fn write_file<P: AsRef<Path>, S: SeekWrite>(file: P, out: &mut S) -> Result<u64> {
+fn write_file<P: AsRef<Path>, S: SeekWrite>(
+    file: P,
+    out: &mut S,
+) -> Result<u64> {
     let mut inode = disk::Inode::default();
     inode.offset = out.stream_position()?.into();
     inode.inode_type = disk::InodeType::File.into();
@@ -47,7 +55,10 @@ fn write_file<P: AsRef<Path>, S: SeekWrite>(file: P, out: &mut S) -> Result<u64>
     Ok(inode_pos)
 }
 
-fn write_symlink<P: AsRef<Path>, S: SeekWrite>(link: P, out: &mut S) -> Result<u64> {
+fn write_symlink<P: AsRef<Path>, S: SeekWrite>(
+    link: P,
+    out: &mut S,
+) -> Result<u64> {
     let mut inode = disk::Inode::default();
     inode.offset = out.stream_position()?.into();
     inode.inode_type = disk::InodeType::Symlink.into();
@@ -60,7 +71,10 @@ fn write_symlink<P: AsRef<Path>, S: SeekWrite>(link: P, out: &mut S) -> Result<u
     Ok(inode_pos)
 }
 
-fn write_directory<P: AsRef<Path>, S: SeekWrite>(dir: P, out: &mut S) -> Result<u64> {
+fn write_directory<P: AsRef<Path>, S: SeekWrite>(
+    dir: P,
+    out: &mut S,
+) -> Result<u64> {
     let mut entries = Vec::new();
     let iter = fs::read_dir(dir)?;
     let tmp: std::result::Result<Vec<_>, io::Error> = iter.collect();

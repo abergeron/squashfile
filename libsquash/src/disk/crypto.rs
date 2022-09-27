@@ -73,7 +73,9 @@ impl<F: ReadAt> ReadAt for EncryptChaCha20<F> {
             let b = &mut buf[pos..pos + l];
             self.block_nonce(&mut nonce, off);
             let mut crypto = ChaCha20::new(&self.key, &nonce);
-            crypto.try_seek(p).map_err(|_| Error::Crypto("Decrypting error"))?;
+            crypto
+                .try_seek(p)
+                .map_err(|_| Error::Crypto("Decrypting error"))?;
             crypto
                 .try_apply_keystream(b)
                 .map_err(|_| Error::Crypto("Decrypting error"))?;
@@ -100,7 +102,9 @@ impl<W: Write> Write for EncryptChaCha20<W> {
             let b = &buf[pos..pos + l];
             self.block_nonce(&mut nonce, off);
             let mut crypto = ChaCha20::new(&self.key, &nonce);
-            crypto.try_seek(p).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            crypto
+                .try_seek(p)
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
             crypto
                 .apply_keystream_b2b(b, &mut self.buf[..l])
                 .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;

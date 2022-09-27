@@ -2,9 +2,9 @@
 extern crate static_assertions;
 
 use std::ffi::OsStr;
+use std::io::Cursor;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
-use std::io::Cursor;
 
 mod disk;
 pub mod error;
@@ -30,7 +30,8 @@ fn extract<P: AsRef<Path>>(dir: &fs::Directory, targ: P) -> Result<()> {
     let target: &Path = targ.as_ref();
     for e in dir.iter() {
         let dent = e?;
-        let subp = target.join(OsStr::from_bytes(&dent.file_name()?.as_bytes()));
+        let subp =
+            target.join(OsStr::from_bytes(&dent.file_name()?.as_bytes()));
         match dent.item()? {
             fs::FSItem::File(ref mut f) => {
                 let mut t = std::fs::File::create(&subp)?;
@@ -41,7 +42,10 @@ fn extract<P: AsRef<Path>>(dir: &fs::Directory, targ: P) -> Result<()> {
                 extract(&d, &subp)?;
             }
             fs::FSItem::Symlink(s) => {
-                std::os::unix::fs::symlink(OsStr::from_bytes(s.get_link()?.as_slice()), &subp)?;
+                std::os::unix::fs::symlink(
+                    OsStr::from_bytes(s.get_link()?.as_slice()),
+                    &subp,
+                )?;
             }
         }
     }
