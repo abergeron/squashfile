@@ -12,18 +12,18 @@ use std::path::PathBuf;
 
 create_exception!(pysquash, SquashError, pyo3::exceptions::PyException);
 
-#[pyclass(module="pysquash.pysquash")]
+#[pyclass(module="pysquash.pysquash", unsendable)]
 struct SquashCursor {
     dir: fs::Directory,
 }
 
-#[pyclass(module="pysquash.pysquash")]
+#[pyclass(module="pysquash.pysquash", unsendable)]
 struct SquashFile {
     f: fs::File,
     pos: u64,
 }
 
-#[pyclass(module="pysquash.pysquash")]
+#[pyclass(module="pysquash.pysquash", unsendable)]
 struct SquashDirIter {
     rd: fs::ReadDir,
 }
@@ -32,8 +32,11 @@ struct SquashDirIter {
 fn convert_err(e: Error) -> PyErr {
     match e {
         Error::IO(e) => e.into(),
+        Error::Hex(_) => SquashError::new_err(format!("Error decoding hex")),
         Error::Format(m) => SquashError::new_err(format!("Invalid value: {m}")),
         Error::Bounds(m) => SquashError::new_err(format!("Value out of bounds: {m}")),
+        Error::Crypto(m) => SquashError::new_err(format!("Crypto error: {m}")),
+        Error::Compression(m) => SquashError::new_err(format!("Decompression error: {m}")),
         Error::InvalidOperation(m) => SquashError::new_err(format!("Invalid operation: {m}")),
     }
 }
@@ -41,10 +44,11 @@ fn convert_err(e: Error) -> PyErr {
 #[pymethods]
 impl SquashCursor {
     #[new]
-    fn new(path: &PyUnicode) -> PyResult<Self> {
+    fn new(path: &PyUnicode, key: Option<&PyBytes>) -> PyResult<Self> {
         let p: PathBuf = path.extract()?;
+        let k = key.map(|b| b.as_bytes());
         Ok(SquashCursor {
-            dir: fs::FS::open(p).map_err(convert_err)?.get_root().map_err(convert_err)?,
+            dir: fs::FS::open_file(p, k).map_err(convert_err)?.get_root().map_err(convert_err)?,
         })
     }
 
@@ -78,11 +82,13 @@ impl SquashCursor {
     }
 }
 
+#[pymethods]
 impl SquashFile {
     fn read<'py>(&mut self, py: Python<'py>, size: usize) -> PyResult<&'py PyBytes> {
-        let res = PyBytes::new_with(py, size,
-                          |buf| self.f.read_at(buf, self.pos).map_err(convert_err));
-        self.pos += size as u64;
+        let sz: usize = std::cmp::min(self.f.size() - self.pos, size as u64).try_into()?;
+        let res = PyBytes::new_with(py, sz,
+                                    |buf| self.f.read_exact_at(buf, self.pos).map_err(convert_err));
+        self.pos += sz as u64;
         res
     }
 
@@ -90,27 +96,22 @@ impl SquashFile {
         self.read(py, self.size() as usize)
     }
 
-    fn readinto(&mut self, b: &mut [u8]) -> PyResult<Option<usize>> {
-        self.f.read_at(b, self.pos).map_err(convert_err)?;
-        self.pos += b.len() as u64;
-        Ok(Some(b.len()))
-    }
-
     fn size(&self) -> u64 {
         self.f.size()
     }
 }
 
+#[pymethods]
 impl SquashDirIter {
     fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
         slf
     }
 
-    fn __next__(&mut self, py: Python<'_>) -> PyResult<Option<PyBytes>> {
+    fn __next__<'py>(&mut self, py: Python<'py>) -> PyResult<Option<&'py PyBytes>> {
        match self.rd.next() {
             None => Ok(None),
             Some(Err(e)) => Err(convert_err(e)),
-            Some(Ok(v)) => Ok(Some(PyBytes::new(py, v.file_name().map_err(convert_err)?.as_bytes()).into()))
+            Some(Ok(v)) => Ok(Some(PyBytes::new(py, v.file_name().map_err(convert_err)?.as_bytes())))
         }
     }
 }
