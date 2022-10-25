@@ -38,4 +38,4 @@ class SquashCursor:
         )
 
     def __iter__(self):
-        self._cur.scandir()
+        return self._cur.scandir()
